@@ -13,19 +13,22 @@ from nltk.corpus import stopwords
 from wordcloud import WordCloud
 nltk.download('stopwords')
 
-import tensorflow as tf
-from tf_keras.preprocessing.text import Tokenizer
-from keras.preprocessing.sequence import pad_sequences
 from sklearn.model_selection import train_test_split
-from keras.callbacks import EarlyStopping, ReduceLROnPlateau
+#Importing modules to use RandomForest
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics import accuracy_score
+
+from sklearn.metrics import confusion_matrix,classification_report
+
 
 import warnings
 warnings.filterwarnings('ignore')
   
 np.random.seed(42)
-tf.random.set_seed(42)
+#tf.random.set_seed(42)
 
-df = pd.read_csv('SMSSpamCollection',sep = '\t',header = None , names = ['label','message'])#Giving names to the columns
+df = pd.read_csv('data\SMSSpamCollection',sep = '\t',header = None , names = ['label','message'])#Giving names to the columns
 print(df.head())
 print(df.shape)
 
@@ -87,57 +90,46 @@ plot_word_cloud(balance[balance['label'] == 'spam'], typ='Spam')
 
 train_X,test_X,train_Y,test_Y = train_test_split(balance['message'],balance['label'],test_size = 0.2,random_state=42)
 
-tokenizer = Tokenizer()
-tokenizer.fit_on_texts(train_X)
-train_sequences = tokenizer.texts_to_sequences(train_X)#Converts the training data string to tokens
-test_sequences = tokenizer.texts_to_sequences(test_X)#same but for testing data to tokens
-
-max_len = 50
-#pad_sequences makes sure all the tokens are of same by adding 0's 
-#padding adds 0 if too short and truncating remove 0's if tokens length exceededs max_len
-train_sequences = pad_sequences(train_sequences, maxlen=max_len, padding='post', truncating='post')
-test_sequences = pad_sequences(test_sequences, maxlen=max_len, padding='post', truncating='post')
-
 
 train_Y = (train_Y == 'spam').astype(int)
 test_Y = (test_Y == 'spam').astype(int)
 
 #define the model parameters
 
-model = tf.keras.models.Sequential([
-    tf.keras.layers.Embedding(input_dim=len(tokenizer.word_index) + 1, output_dim=64, input_length=max_len),#each word becomes a 64 number vector
-    #LSTM Long Short Term Memory remembers context 
-    tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(32)),
-    tf.keras.layers.Dropout(0.3), 
-    tf.keras.layers.Dense(32, activation='relu'),
-    tf.keras.layers.Dense(1, activation='sigmoid')  # Output layer
-])
+tfidf = TfidfVectorizer(max_features=5000)
+X_train_tfidf = tfidf.fit_transform(train_X)
+X_test_tfidf = tfidf.transform(test_X)
 
-model.compile(
-    loss=tf.keras.losses.BinaryCrossentropy(from_logits=False),#measures how wrong the models is
-    optimizer=tf.keras.optimizers.Adam(learning_rate=0.001, clipnorm=1.0),#adjusts weight after each batch to reduce loss
-    metrics=['accuracy']
-)
+rf = RandomForestClassifier(random_state=42)
+rf.fit(X_train_tfidf, train_Y)
+rf_acc = accuracy_score(test_Y, rf.predict(X_test_tfidf))
+print(f"Random Forest Accuracy: {rf_acc*100:.2f}%")#Accuracy prediction
 
-es = EarlyStopping(patience=5, monitor='val_accuracy', restore_best_weights=True)
-lr = ReduceLROnPlateau(patience=2, monitor='val_loss', factor=0.5, verbose=0)
 
-history = model.fit(
-    train_sequences, train_Y,
-    validation_data=(test_sequences, test_Y),
-    epochs=20,
-    batch_size=32,
-    callbacks=[lr, es]
-)
-
-test_loss, test_accuracy = model.evaluate(test_sequences, test_Y)
-print('Test Loss :',test_loss)
-print('Test Accuracy :',test_accuracy)
-
-plt.plot(history.history['accuracy'], label='Training Accuracy')
-plt.plot(history.history['val_accuracy'], label='Validation Accuracy')
-plt.title('Model Accuracy')
-plt.ylabel('Accuracy')
-plt.xlabel('Epoch')
-plt.legend()
+pred_Y = rf.predict(X_test_tfidf)
+cm = confusion_matrix(test_Y, pred_Y)
+sns.heatmap(cm, annot=True, fmt='d', cmap='Blues',
+            xticklabels=['Ham', 'Spam'],
+            yticklabels=['Ham', 'Spam'])
+plt.title('Random Forest - Confusion Matrix')
 plt.show()
+plt.close()
+
+feature_names = tfidf.get_feature_names_out()#all important words 
+importances = rf.feature_importances_#importance score is given to each word
+indices = importances.argsort()[-10:][::-1]#sort in ascending order by importance score we take last 5 words and reverse the list
+
+#Visually representing important words
+plt.figure(figsize=(10, 5))
+plt.bar(range(10), importances[indices])
+plt.xticks(range(10), [feature_names[i] for i in indices])
+plt.title('Top 10 Important Words - Random Forest')
+plt.tight_layout()
+plt.show()
+plt.close()
+
+#Saving the randomforest model
+import joblib
+
+joblib.dump(rf, 'random_forest.pkl')#all the decisions made by randomforest
+joblib.dump(tfidf, 'tfidf_vectorizer.pkl')#text to numbers mapping
