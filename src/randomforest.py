@@ -26,7 +26,6 @@ import warnings
 warnings.filterwarnings('ignore')
   
 np.random.seed(42)
-#tf.random.set_seed(42)
 
 df = pd.read_csv('data\SMSSpamCollection',sep = '\t',header = None , names = ['label','message'])#Giving names to the columns
 print(df.head())
