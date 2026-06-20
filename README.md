@@ -50,6 +50,7 @@ Random Forest also offers feature importance, showing which words most strongly 
 
 ## Project Structure
 
+```text
 SMS-E-mail-Spam-detection/
 │
 ├── data/
@@ -68,16 +69,17 @@ SMS-E-mail-Spam-detection/
 │   └── evaluate.py
 │
 ├── screenshots/
-│   ├── app_home.png              # Main Streamlit interface
-│   ├── case1.png                 # Example where models disagree
+│   ├── app_home.png      # Main Streamlit interface
+│   ├── case1.png         # Example where models disagree
 │   ├── spam.png          # Example spam prediction
 │   └── ham.png           # Example legitimate message prediction
-|
+│
 ├── app.py
 ├── requirements.txt
 ├── README.md
 ├── .gitignore
 └── LICENSE
+```
 
 ## Setup
 
